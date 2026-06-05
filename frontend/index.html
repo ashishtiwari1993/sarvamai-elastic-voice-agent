@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pratham Bank · Mitr — Voice Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .dev { font-family: 'Tiro Devanagari Hindi', serif; }
+    .tricolor { background: linear-gradient(90deg, #FF9933 0%, #ffffff 50%, #138808 100%); }
+    @keyframes pulse-ring { 0% { transform: scale(.9); opacity:.7;} 70% { transform: scale(1.5); opacity:0;} 100% { opacity:0;} }
+    .pulse::before { content:''; position:absolute; inset:0; border-radius:9999px; background:#ef4444; animation:pulse-ring 1.4s cubic-bezier(.2,.6,.5,1) infinite; }
+    .fade-in { animation: fade .35s ease both; } @keyframes fade { from {opacity:0; transform:translateY(6px);} to {opacity:1; transform:none;} }
+    .spin { animation: sp 1s linear infinite; } @keyframes sp { to { transform: rotate(360deg);} }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <div class="tricolor h-1 w-full"></div>
+
+  <div class="max-w-4xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <header class="flex items-center gap-3 mb-6">
+      <div class="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-500 to-green-600 flex items-center justify-center text-white text-2xl shadow-sm">🛡️</div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight">Pratham Bank · <span class="text-orange-600">Mitr</span></h1>
+        <p class="text-sm text-slate-500">"Where is my money?" voice support · <span class="dev">आपका बैंकिंग साथी</span></p>
+      </div>
+      <div class="ml-auto text-right hidden sm:block">
+        <div class="text-xs text-slate-400">Powered by</div>
+        <div class="text-xs font-semibold text-slate-600">Elastic Agent Builder + Sarvam AI</div>
+      </div>
+    </header>
+
+    <!-- Caller panel -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-5">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Caller (demo login)</span>
+        <button id="newCall" class="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50">↻ New call</button>
+      </div>
+      <div id="callerList" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+      <div id="callerHint" class="mt-3 text-xs text-slate-500 hidden">
+        <span class="inline-block bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-1">
+          🔐 Verification hint (for you): DOB is <b id="dobHint"></b> — Mitr will ask for it before sharing money details.
+        </span>
+      </div>
+    </div>
+
+    <!-- Mic card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center mb-5">
+      <div class="flex items-center gap-2 mb-4 text-sm">
+        <span class="text-slate-500">Language:</span>
+        <button data-lang="" class="lang-btn px-3 py-1 rounded-full border bg-white border-orange-400 text-orange-700 font-medium">Auto</button>
+        <button data-lang="hi-IN" class="lang-btn px-3 py-1 rounded-full border bg-white border-slate-200 text-slate-600">हिंदी</button>
+        <button data-lang="mr-IN" class="lang-btn px-3 py-1 rounded-full border bg-white border-slate-200 text-slate-600">मराठी</button>
+        <button data-lang="en-IN" class="lang-btn px-3 py-1 rounded-full border bg-white border-slate-200 text-slate-600">English</button>
+      </div>
+
+      <button id="micBtn" class="relative h-20 w-20 rounded-full bg-orange-500 hover:bg-orange-600 transition shadow-lg flex items-center justify-center text-white">
+        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+      <p id="micLabel" class="mt-4 text-sm font-medium text-slate-600">Tap to speak · <span class="dev">बोलने के लिए टैप करें</span></p>
+
+      <div id="suggestions" class="flex flex-wrap justify-center gap-2 mt-4"></div>
+
+      <div class="mt-5 w-full flex gap-2">
+        <input id="textInput" type="text" placeholder="…or type your question here" class="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        <button id="sendText" class="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm hover:bg-slate-900">Send</button>
+      </div>
+    </div>
+
+    <!-- Status / pipeline -->
+    <div id="status" class="hidden mb-6 bg-white rounded-xl border border-slate-100 p-4 text-sm">
+      <div class="flex items-center gap-2 text-slate-600">
+        <svg class="spin h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        <span id="statusText">Working…</span>
+      </div>
+      <div id="pipeline" class="flex flex-wrap gap-1.5 mt-3"></div>
+    </div>
+
+    <div id="convo" class="space-y-4"></div>
+    <audio id="player" class="hidden"></audio>
+  </div>
+
+<script>
+const PIPE = [["stt","🎙️ Sarvam STT"],["xlate1","🔁 → English"],["agent","🔎 Elastic Agent"],["xlate2","🔁 → reply"],["tts","🔊 Sarvam TTS"]];
+const $ = (id) => document.getElementById(id);
+let forcedLang = "", customers = [], current = null;
+let mediaRecorder, chunks = [], recording = false;
+
+// ── WebAudio context (stays unlocked after first click) ──────
+let _audioCtx = null;
+function getAudioCtx(){
+  if(!_audioCtx) _audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(_audioCtx.state==="suspended") _audioCtx.resume();
+  return _audioCtx;
+}
+document.addEventListener("click", ()=>getAudioCtx(), {once:true});
+
+async function playAudio(b64){
+  if(!b64) return;
+  try{
+    const bytes=atob(b64), arr=new Uint8Array(bytes.length);
+    for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+    const ctx=getAudioCtx();
+    if(ctx.state==="suspended") await ctx.resume();
+    const buf=await ctx.decodeAudioData(arr.buffer.slice(0));
+    const src=ctx.createBufferSource();
+    src.buffer=buf; src.connect(ctx.destination); src.start(0);
+  }catch(e){ console.warn("Audio play failed:",e); }
+}
+
+// ── Load demo callers ───────────────────────────────────────
+async function loadCustomers(){
+  customers = await fetch("/api/customers").then(r=>r.json());
+  const wrap = $("callerList"); wrap.innerHTML = "";
+  customers.forEach((c)=>{
+    const b = document.createElement("button");
+    b.className = "caller-btn text-left rounded-xl border p-2.5 hover:border-orange-300 transition";
+    b.dataset.id = c.customer_id;
+    b.innerHTML = `<div class="text-sm font-semibold text-slate-700">${c.name}</div>
+      <div class="text-[11px] text-slate-400">${c.city} · A/C ••${c.account_last4}</div>
+      <div class="text-[11px] text-slate-500 mt-1 leading-snug">${c.hook}</div>`;
+    b.addEventListener("click", ()=>selectCustomer(c.customer_id));
+    wrap.appendChild(b);
+  });
+  selectCustomer(customers[0].customer_id);
+}
+async function selectCustomer(id){
+  current = customers.find(c=>c.customer_id===id);
+  document.querySelectorAll(".caller-btn").forEach(b=>{
+    const on = b.dataset.id===id;
+    b.classList.toggle("border-orange-400", on);
+    b.classList.toggle("bg-orange-50", on);
+    b.classList.toggle("border-slate-200", !on);
+  });
+  $("dobHint").textContent = current.dob_hint;
+  $("callerHint").classList.remove("hidden");
+  renderSuggestions();
+  convo.innerHTML = "";
+  await fetch("/api/reset", {method:"POST", body:new URLSearchParams({customer_id:id})});
+}
+function renderSuggestions(){
+  const s = {
+    CUST1001:["Did my salary come this month?","Where is my Flipkart refund?","What is my current balance?"],
+    CUST1002:["मेरे खाते से पैसे क्यों कटे?","I see a payment I did not make","How do I report this fraud?"],
+    CUST1003:["मेरी पेंशन आई या नहीं?","Show my last transactions","When will my pension come?"],
+    CUST1004:["मेरा refund कब आएगा?","What is my balance?","Did my refund come?"],
+  }[current.customer_id] || [];
+  $("suggestions").innerHTML = s.map(t=>`<button class="sugg px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs hover:bg-slate-200">${t}</button>`).join("");
+  document.querySelectorAll(".sugg").forEach(btn=>btn.addEventListener("click",()=>{ $("textInput").value=btn.textContent; sendText(); }));
+}
+$("newCall").addEventListener("click", ()=>{ if(current) selectCustomer(current.customer_id); });
+
+// ── Language chips ──────────────────────────────────────────
+document.querySelectorAll(".lang-btn").forEach(btn=>btn.addEventListener("click",()=>{
+  forcedLang = btn.dataset.lang;
+  document.querySelectorAll(".lang-btn").forEach(b=>{ b.classList.remove("border-orange-400","text-orange-700","font-medium"); b.classList.add("border-slate-200","text-slate-600"); });
+  btn.classList.add("border-orange-400","text-orange-700","font-medium"); btn.classList.remove("border-slate-200","text-slate-600");
+}));
+
+// ── UI helpers ──────────────────────────────────────────────
+const convo = $("convo");
+function showStatus(a){ $("status").classList.toggle("hidden",!a); if(a) $("pipeline").innerHTML = PIPE.map(([k,l])=>`<span data-step="${k}" class="px-2 py-1 rounded-md bg-slate-100 text-slate-400 text-xs">${l}</span>`).join(""); }
+function markStep(k){ const el=document.querySelector(`[data-step="${k}"]`); if(el){ el.classList.remove("bg-slate-100","text-slate-400"); el.classList.add("bg-green-100","text-green-700"); } }
+function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function addTurn(d){
+  const div = document.createElement("div");
+  div.className = "fade-in space-y-3";
+  div.innerHTML = `
+    <div class="flex justify-end"><div class="max-w-[70%] bg-orange-500 text-white rounded-2xl rounded-br-sm px-4 py-2.5 shadow-sm">
+      <div class="text-[11px] uppercase tracking-wide opacity-80 mb-0.5">${escapeHtml(d.customer?.name||"You")}</div>
+      <div class="text-sm">${escapeHtml(d.transcript)}</div></div></div>
+    <div class="flex justify-start"><div class="max-w-[70%] bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
+      <div class="text-[11px] uppercase tracking-wide text-orange-600 font-semibold mb-1">Mitr</div>
+      <div class="text-sm text-slate-800 leading-relaxed">${escapeHtml(d.answer_local)}</div>
+      <details class="mt-2"><summary class="text-[11px] text-slate-400 cursor-pointer hover:text-slate-600">behind the scenes ▾</summary>
+        <div class="mt-2 space-y-1.5 text-xs bg-slate-50 rounded-lg p-3">
+          <div><span class="text-slate-400">English query → Elastic:</span> <span class="text-slate-700">${escapeHtml(d.query_en)}</span></div>
+          <div><span class="text-slate-400">Agent answer (English):</span> <span class="text-slate-700">${escapeHtml(d.answer_en)}</span></div>
+        </div></details></div></div>`;
+  convo.prepend(div);
+}
+
+async function runPipelineUI(promise){
+  showStatus(true); $("statusText").textContent="Listening & understanding…";
+  const order=["stt","xlate1","agent","xlate2","tts"]; let i=0;
+  const t=setInterval(()=>{ if(i<order.length) markStep(order[i++]); },650);
+  try{
+    const data=await promise; order.forEach(markStep); clearInterval(t);
+    if(data.error){ $("statusText").textContent="⚠️ "+data.error; return; }
+    showStatus(false); addTurn(data); playAudio(data.audio_base64);
+  }catch(e){ clearInterval(t); $("statusText").textContent="⚠️ "+(e.message||"Something went wrong"); }
+}
+
+// ── Microphone (MediaRecorder — sends audio directly to Sarvam) ──────
+$("micBtn").addEventListener("click", async ()=>{
+  if(recording){ stopRec(); return; }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    // Prefer formats Sarvam accepts; fall back to browser default
+    const mimeType = ["audio/webm;codecs=opus","audio/webm","audio/ogg","audio/mp4",""]
+      .find(m=>!m||MediaRecorder.isTypeSupported(m)) || "";
+    mediaRecorder = mimeType ? new MediaRecorder(stream,{mimeType}) : new MediaRecorder(stream);
+    chunks=[];
+    mediaRecorder.ondataavailable=e=>{ if(e.data && e.data.size>0) chunks.push(e.data); };
+    mediaRecorder.onstop=()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      // wait one tick so all ondataavailable events have fired
+      setTimeout(()=>{
+        if(chunks.length===0){ $("statusText").textContent="⚠️ No audio captured — please try again."; showStatus(true); return; }
+        const mime=mediaRecorder.mimeType||"audio/webm";
+        const blob=new Blob(chunks,{type:mime});
+        sendVoice(blob);
+      }, 100);
+    };
+    mediaRecorder.start(250); // collect data every 250ms
+    recording=true;
+    $("micBtn").classList.add("pulse","bg-red-500"); $("micBtn").classList.remove("bg-orange-500");
+    $("micLabel").innerHTML='Listening… tap to stop · <span class="dev">सुन रहा हूँ…</span>';
+  }catch(e){ alert("Microphone permission is needed. You can also type your question."); }
+});
+function stopRec(){
+  recording=false;
+  try{ mediaRecorder.requestData(); mediaRecorder.stop(); }catch(e){}
+  $("micBtn").classList.remove("pulse","bg-red-500"); $("micBtn").classList.add("bg-orange-500");
+  $("micLabel").innerHTML='Tap to speak · <span class="dev">बोलने के लिए टैप करें</span>';
+}
+
+function sendVoice(blob){
+  const fd=new FormData();
+  const ext=blob.type.includes("ogg")?"ogg":blob.type.includes("mp4")?"mp4":blob.type.includes("wav")?"wav":"webm";
+  fd.append("file", blob, "audio."+ext);
+  fd.append("customer_id", current.customer_id);
+  if(forcedLang) fd.append("force_language", forcedLang);
+  runPipelineUI(fetch("/api/voice",{method:"POST",body:fd}).then(handle));
+}
+$("sendText").addEventListener("click", sendText);
+$("textInput").addEventListener("keydown", e=>{ if(e.key==="Enter") sendText(); });
+function sendText(){
+  const msg=$("textInput").value.trim(); if(!msg||!current) return; $("textInput").value="";
+  const fd=new FormData(); fd.append("message",msg); fd.append("customer_id",current.customer_id); fd.append("language", forcedLang||"en-IN");
+  runPipelineUI(fetch("/api/text",{method:"POST",body:fd}).then(handle));
+}
+async function handle(res){ if(!res.ok){ let m="Request failed"; try{const j=await res.json(); m=j.detail||m;}catch(e){} return {error:m}; } return res.json(); }
+
+loadCustomers();
+</script>
+</body>
+</html>
