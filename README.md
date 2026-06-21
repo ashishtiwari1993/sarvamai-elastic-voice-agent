@@ -48,6 +48,8 @@ https://github.com/user-attachments/assets/ff6b4c48-1958-4320-9bcc-ffa2aaf84a37
 
 ## 🧠 Architecture
 
+![Pratham Bank · Mitr architecture — Sarvam AI speech/translation + Elastic Agent Builder over private transactions and a semantic knowledge base](assets/architecture.png)
+
 | Layer | Technology | Default |
 |------|------------|---------|
 | Speech → Text | Sarvam | `saaras:v3` (auto language detect) |
@@ -58,6 +60,11 @@ https://github.com/user-attachments/assets/ff6b4c48-1958-4320-9bcc-ffa2aaf84a37
 | Text → Speech | Sarvam | `bulbul` |
 | Backend | FastAPI (Python) | serves API **and** the frontend |
 | Frontend | single‑file HTML + Tailwind | mic UI + typed fallback |
+
+> Elasticsearch is always queried in **English**; the caller is heard and
+> answered in their own language. Embeddings for `bank-support-kb` are generated
+> by the Jina inference endpoint at ingest time; the agent's LLM can be the
+> Agent Builder default or a custom `inference_id` (e.g. Groq).
 
 ### Elasticsearch indices
 
