@@ -10,20 +10,7 @@ looks up their **real transaction history in Elasticsearch**, and answers — in
 caller's own language — *"where is my money?"*: a pending refund, a delayed pension,
 a salary credit, or a **suspicious UPI debit** that needs to be reported as fraud.
 
-```
-🎙️ Caller speaks (hi / mr / en)
-        │
-        ▼
-  Sarvam STT  ──►  Sarvam Translate → English  ──►  Elastic Agent Builder
- (saaras:v3)         (mayura:v1)                    (verifies ID, queries the
-        ▲                                            caller's transactions + KB)
-        │                                                     │
-  Audio played ◄── Sarvam TTS ◄── Sarvam Translate ◄──────────┘
-  (bulbul)              (back to caller's language: the English answer)
-```
-
-> **Design rule:** Elasticsearch is always queried in **English**; the caller is
-> always heard and answered in **their own language**. Sarvam translates both ends.
+![Pratham Bank · Mitr architecture — Sarvam AI speech/translation + Elastic Agent Builder over private transactions and a semantic knowledge base](assets/architecture.png)
 
 ---
 
@@ -48,7 +35,7 @@ https://github.com/user-attachments/assets/ff6b4c48-1958-4320-9bcc-ffa2aaf84a37
 
 ## 🧠 Architecture
 
-![Pratham Bank · Mitr architecture — Sarvam AI speech/translation + Elastic Agent Builder over private transactions and a semantic knowledge base](assets/architecture.png)
+
 
 | Layer | Technology | Default |
 |------|------------|---------|
@@ -61,10 +48,9 @@ https://github.com/user-attachments/assets/ff6b4c48-1958-4320-9bcc-ffa2aaf84a37
 | Backend | FastAPI (Python) | serves API **and** the frontend |
 | Frontend | single‑file HTML + Tailwind | mic UI + typed fallback |
 
-> Elasticsearch is always queried in **English**; the caller is heard and
-> answered in their own language. Embeddings for `bank-support-kb` are generated
+> The caller is heard and answered in their own language. Embeddings for `bank-support-kb` are generated
 > by the Jina inference endpoint at ingest time; the agent's LLM can be the
-> Agent Builder default or a custom `inference_id` (e.g. Groq).
+> Agent Builder default or a custom `inference_id` (e.g. OpenAI, Anthropic, Groq).
 
 ### Elasticsearch indices
 
