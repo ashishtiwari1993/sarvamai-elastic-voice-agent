@@ -29,29 +29,7 @@ a salary credit, or a **suspicious UPI debit** that needs to be reported as frau
 
 ## 🎥 Demo
 
-<!--
-  EMBED YOUR VIDEO HERE. Pick ONE of the two options below:
-
-  Option A — GitHub-hosted (recommended for .mp4/.mov):
-    1. Open this repo on github.com → create a new Issue (don't submit it) OR
-       edit the README via the web editor.
-    2. DRAG-AND-DROP your video file into the text box. GitHub uploads it and
-       inserts a link like https://github.com/user-attachments/assets/XXXX.
-    3. Paste that exact URL on its own line below — GitHub renders a player.
-
-  Option B — YouTube (GitHub can't embed iframes, so use a clickable thumbnail):
-    [![Watch the demo](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://youtu.be/VIDEO_ID)
--->
-
-https://github.com/USERNAME/REPO/raw/main/assets/sarvamai-elastic-voice-agent.mp4
-
-▶️ Fallback: **[watch the demo video](assets/sarvamai-elastic-voice-agent.mp4)**
-
-> The bare `raw` URL above renders an **inline player** on github.com. Replace
-> `USERNAME/REPO` with your repo path (and `main` if your default branch differs).
-> The video is committed at `assets/sarvamai-elastic-voice-agent.mp4`. If you'd
-> rather not commit a large file, drag it into a GitHub issue to get a hosted
-> `…/assets/…` URL and paste that here instead.
+https://github.com/user-attachments/assets/ff6b4c48-1958-4320-9bcc-ffa2aaf84a37
 
 ## ✨ What this demonstrates
 
