@@ -1,0 +1,11 @@
+.env
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.wav
+*.mp3
+.DS_Store
+docs/

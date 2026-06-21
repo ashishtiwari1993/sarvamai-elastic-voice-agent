@@ -1,4 +1,4 @@
-# CLAUDE.md — Bharat Bank · Mitra Voice Agent
+# CLAUDE.md — Pratham Bank · Mitra Voice Agent
 
 Context for Claude Code working in this repo.
 
@@ -25,7 +25,7 @@ mic → Sarvam STT (saaras:v3) → Sarvam translate→EN (mayura:v1)
 - `bank-customers` — private profiles incl. `dob` for identity verification.
 
 ### Agent Builder (created by scripts/03_create_agent.py)
-Agent `bharat-bank-support-agent` with 3 tools:
+Agent `pratham-bank-support-agent` with 3 tools:
 - `bank_kb_search` (index_search → bank-support-kb)
 - `customer_profile` (esql, param `customer_id`) — used to verify DOB
 - `customer_transactions` (esql, param `customer_id`) — recent transactions

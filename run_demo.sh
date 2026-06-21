@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command setup + run for the Bharat Bank Voice Agent demo.
+# One-command setup + run for the Pratham Bank Voice Agent demo.
 set -e
 cd "$(dirname "$0")"
 

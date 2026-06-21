@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(uvicorn app:app --host 0.0.0.0 --port 8000)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(curl -s http://localhost:8000/api/health)",
+      "Bash(curl -s -X POST http://localhost:8000/api/text -F 'message=What is my balance?' -F customer_id=CUST1001 -F language=en-IN)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('answer_en:', d.get\\('answer_en','ERROR'\\)\\); print\\('error:', d.get\\('error','none'\\)\\)\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c ' *)",
+      "Bash(pkill -f \"uvicorn app:app\")",
+      "Bash(uvicorn app:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(ffmpeg -version)",
+      "Bash(python3 -c \"import pydub; print\\('pydub OK'\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/api/text -F 'message=मेरा बैलेंस क्या है?' -F customer_id=CUST1002 -F language=hi-IN)"
+    ]
+  }
+}

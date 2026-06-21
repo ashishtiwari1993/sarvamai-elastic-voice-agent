@@ -1,0 +1,46 @@
+# Pratham Bank · Mitr — Docker Compose
+#
+#  One-time setup (creates indices, ingests data, creates the Agent Builder agent):
+#     docker compose --profile setup up --build
+#
+#  Run the app (after setup):
+#     docker compose up --build         ->  http://localhost:8000
+#
+#  Both read credentials from your local .env file.
+
+services:
+  # One-shot: DELETE everything this demo created (indices + agent + tools).
+  teardown:
+    build: .
+    image: pratham-mitr:latest
+    env_file: .env
+    working_dir: /app
+    profiles: ["teardown"]
+    command: ["python", "scripts/00_teardown.py"]
+
+  # One-shot: create the 3 indices, ingest data (+ embeddings), create the agent.
+  setup:
+    build: .
+    image: pratham-mitr:latest
+    env_file: .env
+    working_dir: /app
+    profiles: ["setup"]
+    command: >
+      sh -c "python scripts/01_create_index.py &&
+             python scripts/02_ingest_data.py &&
+             python scripts/03_create_agent.py"
+
+  # The voice agent web server (serves API + frontend at :8000).
+  app:
+    build: .
+    image: pratham-mitr:latest
+    env_file: .env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -1,5 +1,5 @@
 """
-Bharat Bank Voice Agent — FastAPI backend ("Where is my money?").
+Pratham Bank Voice Agent — FastAPI backend ("Where is my money?").
 
 Pipeline for one voice turn:
   1. STT       Sarvam /speech-to-text  -> caller's words + detected language
@@ -18,6 +18,7 @@ A per-customer conversation id is kept so verification persists within a call.
 """
 import os
 import json
+import time
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -33,7 +34,7 @@ FRONTEND_DIR = os.path.join(HERE, "..", "frontend")
 DATA_DIR = os.path.join(HERE, "..", "data")
 EN = "en-IN"
 
-app = FastAPI(title="Bharat Bank Voice Agent")
+app = FastAPI(title="Pratham Bank Voice Agent")
 sarvam = SarvamClient()
 agent = AgentBuilderClient()
 
@@ -125,19 +126,24 @@ async def voice(file: UploadFile = File(...), customer_id: str = Form(...),
     if not audio:
         raise HTTPException(400, "Empty audio upload")
     try:
+        c = time.perf_counter
+        t, t0 = {}, time.perf_counter()
         ct = file.content_type or "audio/webm"
         audio_data, fname, fct = _prepare_audio(audio, ct)
-        stt = sarvam.speech_to_text(audio_data, fname, fct)
+
+        s = c(); stt = sarvam.speech_to_text(audio_data, fname, fct); t["stt"] = c() - s
         transcript = (stt.get("transcript") or "").strip()
         lang = _lang(force_language or stt.get("language_code"))
         if not transcript:
             raise HTTPException(422, "Could not transcribe audio. Please try again.")
 
-        query_en = sarvam.translate(transcript, lang, EN) if lang != EN else transcript
-        result = _run(cust, query_en)
+        s = c(); query_en = sarvam.translate(transcript, lang, EN) if lang != EN else transcript; t["translate_in"] = c() - s
+        s = c(); result = _run(cust, query_en); t["agent"] = c() - s
         answer_en = result["answer"] or "I'm sorry, I could not find that. Please call customer care at 1800-123-4567."
-        answer_local = sarvam.translate(answer_en, EN, lang) if lang != EN else answer_en
-        audio_b64 = sarvam.text_to_speech(answer_local, lang)
+        s = c(); answer_local = sarvam.translate(answer_en, EN, lang) if lang != EN else answer_en; t["translate_out"] = c() - s
+        s = c(); audio_b64 = sarvam.text_to_speech(answer_local, lang); t["tts"] = c() - s
+        t["total"] = c() - t0
+        print("⏱  /api/voice  " + "  ".join(f"{k}={v:.2f}s" for k, v in t.items()))
 
         return JSONResponse({
             "customer": {"id": cust["customer_id"], "name": cust["name"]},
@@ -147,6 +153,7 @@ async def voice(file: UploadFile = File(...), customer_id: str = Form(...),
             "answer_en": answer_en,
             "answer_local": answer_local,
             "audio_base64": audio_b64,
+            "timings": {k: round(v, 2) for k, v in t.items()},
         })
     except HTTPException:
         raise
@@ -160,11 +167,15 @@ async def text(message: str = Form(...), customer_id: str = Form(...),
     cust = _caller(customer_id)
     lang = _lang(language)
     try:
-        query_en = sarvam.translate(message, lang, EN) if lang != EN else message
-        result = _run(cust, query_en)
+        c = time.perf_counter
+        t, t0 = {}, time.perf_counter()
+        s = c(); query_en = sarvam.translate(message, lang, EN) if lang != EN else message; t["translate_in"] = c() - s
+        s = c(); result = _run(cust, query_en); t["agent"] = c() - s
         answer_en = result["answer"] or "I'm sorry, I could not find that."
-        answer_local = sarvam.translate(answer_en, EN, lang) if lang != EN else answer_en
-        audio_b64 = sarvam.text_to_speech(answer_local, lang)
+        s = c(); answer_local = sarvam.translate(answer_en, EN, lang) if lang != EN else answer_en; t["translate_out"] = c() - s
+        s = c(); audio_b64 = sarvam.text_to_speech(answer_local, lang); t["tts"] = c() - s
+        t["total"] = c() - t0
+        print("⏱  /api/text   " + "  ".join(f"{k}={v:.2f}s" for k, v in t.items()))
         return JSONResponse({
             "customer": {"id": cust["customer_id"], "name": cust["name"]},
             "detected_language": lang,
@@ -173,6 +184,7 @@ async def text(message: str = Form(...), customer_id: str = Form(...),
             "answer_en": answer_en,
             "answer_local": answer_local,
             "audio_base64": audio_b64,
+            "timings": {k: round(v, 2) for k, v in t.items()},
         })
     except Exception as e:
         raise HTTPException(502, f"Pipeline error: {type(e).__name__}: {e}")

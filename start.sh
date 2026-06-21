@@ -12,7 +12,7 @@ fi
 echo "📦 Ensuring dependencies are installed..."
 pip install -q -r requirements.txt
 
-echo "✅ Starting Bharat Bank · Mitra at http://localhost:8000"
+echo "✅ Starting Pratham Bank · Mitra at http://localhost:8000"
 echo "   (Ctrl+C to stop)"
 echo ""
 cd backend

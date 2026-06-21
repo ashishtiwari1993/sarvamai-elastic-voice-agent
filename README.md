@@ -1,143 +1,280 @@
-# 🛡️ Bharat Bank · Mitra — "Where Is My Money?" Voice Agent (Elastic Agent Builder + Sarvam AI)
+# 🛡️ Pratham Bank · Mitr — Multilingual Voice Banking Agent
 
-A working demo of a **multilingual voice bank agent** for India. A customer
-calls in (in **Hindi or English**, switching freely), the agent **verifies
-their identity**, looks up their **actual transaction history in Elasticsearch**,
-and tells them — in their own language — *where their money is*: a pending
-refund, a delayed pension, a salary credit, or a **suspicious UPI debit** that
-needs to be reported as fraud.
+> A reference implementation of a **voice AI agent for Indian banking**, built with
+> **Elastic Agent Builder** (the brain, grounded in Elasticsearch) and **Sarvam AI**
+> (speech‑to‑text, translation, text‑to‑speech for Indian languages).
 
-- **Brain:** an **Elastic Agent Builder** agent grounded in Elasticsearch data.
-- **Voice + language:** **Sarvam AI** (speech-to-text, translation, text-to-speech) — built for Indian languages.
+A customer calls in and speaks naturally — in **Hindi, Marathi, or English**, even
+switching language mid‑call. The agent **greets them**, **verifies their identity**,
+looks up their **real transaction history in Elasticsearch**, and answers — in the
+caller's own language — *"where is my money?"*: a pending refund, a delayed pension,
+a salary credit, or a **suspicious UPI debit** that needs to be reported as fraud.
 
-> Design choice: **Elasticsearch is always queried in English**, while the
-> customer is heard and answered in their own language. Sarvam translates both ends.
+```
+🎙️ Caller speaks (hi / mr / en)
+        │
+        ▼
+  Sarvam STT  ──►  Sarvam Translate → English  ──►  Elastic Agent Builder
+ (saaras:v3)         (mayura:v1)                    (verifies ID, queries the
+        ▲                                            caller's transactions + KB)
+        │                                                     │
+  Audio played ◄── Sarvam TTS ◄── Sarvam Translate ◄──────────┘
+  (bulbul)              (back to caller's language: the English answer)
+```
+
+> **Design rule:** Elasticsearch is always queried in **English**; the caller is
+> always heard and answered in **their own language**. Sarvam translates both ends.
 
 ---
 
-## How it works
+## ✨ What this demonstrates
 
-```
-🎙️  Customer speaks (Hindi / English)
-      │
-      ▼
-1) Sarvam  Speech-to-Text   →  transcript + auto-detected language
-2) Sarvam  Translate         →  English query
-3) Elastic Agent Builder     →  verifies identity (DOB) on the first turn, then:
-      │                          • customer_transactions (ES|QL, this caller only)
-      │                          • customer_profile      (ES|QL, identity/status)
-      │                          • bank_kb_search         (semantic KB: rates, fraud, timelines)
-      ▼
-4) Sarvam  Translate         →  answer back in the customer's language
-5) Sarvam  Text-to-Speech    →  spoken reply  🔊
-```
+- A **voice agent** built on Elastic Agent Builder with **zero custom RAG plumbing** —
+  the agent orchestrates tools and the LLM inside Elastic.
+- **Private, per‑customer data** (transactions, profiles) queried safely with
+  **parameterised ES|QL tools** scoped to one `customer_id`.
+- **Semantic search** over a knowledge base using `semantic_text` + an inference
+  endpoint (no manual embedding pipeline).
+- **Identity verification** (date of birth) before any money detail is shared.
+- **On‑the‑fly language switching** and natural Indian‑language speech via Sarvam.
+- Pluggable **chat‑completion model** for the agent (e.g. point it at a fast Groq
+  endpoint) and a configurable TTS **voice**.
 
-| Layer | Technology | Model |
-|------|-------------|-------|
+---
+
+## 🧠 Architecture
+
+| Layer | Technology | Default |
+|------|------------|---------|
 | Speech → Text | Sarvam | `saaras:v3` (auto language detect) |
 | Translation | Sarvam | `mayura:v1` |
 | Reasoning / tools | Elastic Agent Builder | custom agent + 3 tools |
+| Agent LLM | Elastic inference / connector | default, or `AGENT_INFERENCE_ID` |
 | Embeddings | Elasticsearch inference | `.jina-embeddings-v5-text-small` |
-| Text → Speech | Sarvam | `bulbul:v2` |
+| Text → Speech | Sarvam | `bulbul` |
+| Backend | FastAPI (Python) | serves API **and** the frontend |
+| Frontend | single‑file HTML + Tailwind | mic UI + typed fallback |
+
+### Elasticsearch indices
+
+| Index | Type | Contents |
+|-------|------|----------|
+| `bank-support-kb` | generic | Loan/FD rates, fees, UPI‑fraud procedures (1930, cybercrime.gov.in), refund/pension/failed‑txn explainers. Stored as **plaintext + `semantic_text`**. |
+| `bank-transactions` | private | **100+ transactions generated at ingest time with dates in the last 30 days** — salary, EMI, UPI, ATM, POS, refunds, pension, with status + running balance. |
+| `bank-customers` | private | One profile per customer incl. **date of birth** (for verification), KYC/UPI/account status. |
+
+### Agent Builder tools
+
+- `bank_kb_search` — `index_search` over `bank-support-kb` (hybrid BM25 + semantic)
+- `customer_profile` — ES|QL, returns one customer's profile (used to verify DOB)
+- `customer_transactions` — ES|QL, returns one customer's recent transactions
+
+The backend passes the authenticated `customer_id` as trusted context and keeps a
+per‑caller Agent Builder `conversation_id`, so verification persists within a call.
 
 ---
 
-## Data — three indices
+## ✅ Prerequisites
 
-| Index | Type | What's in it |
-|-------|------|--------------|
-| `bank-customers` | **private** | One profile per customer: name, account, registered mobile (last 4), **date of birth** (for verification), KYC/UPI/account status, products. |
-| `bank-transactions` | **private** | **100+ per-customer transactions, generated at ingest time with dates in the last 30 days** (salary, EMI, UPI, ATM, POS, refunds, pension, interest) with amount, channel, counterparty, status (`SUCCESS`/`PENDING`/`FAILED`/`DISPUTED`) and running balance. |
-| `bank-support-kb` | **generic** | Loan & FD rates, fees/charges, UPI-fraud procedures (1930, cybercrime.gov.in), and "where is my money" explainers (failed-transaction auto-reversal, refund & pension timelines). Stored as **plaintext + `semantic_text`** (Jina embeddings). |
-
-The private indices are queried with **parameterised ES|QL tools scoped to one
-`customer_id`**; the generic index is searched semantically.
-
-### Four demo callers (each a "where is my money" story)
-- **Rajesh Kumar** (Bengaluru) — salary credited, home-loan EMI debited, Flipkart refund **pending**.
-- **Priya Sharma** (Pune) — a **disputed ₹14,999 UPI debit** to an unknown payee → fraud flow.
-- **Anil Verma** (Lucknow) — pensioner whose pension is **still processing** this month.
-- **Sunita Devi** (Patna) — waiting on a **₹2,499 Meesho refund**.
+1. **An Elastic deployment with Agent Builder enabled** (Elastic Cloud / Serverless),
+   plus:
+   - a **text‑embedding inference endpoint** for `semantic_text`
+     (this demo uses `.jina-embeddings-v5-text-small`), and
+   - an LLM connector/inference for the agent (the default, or your own
+     `chat_completion` endpoint).
+2. **A Sarvam AI API key** — <https://dashboard.sarvam.ai>.
+3. **Encoded Elastic API key(s)** (base64 of `id:api_key`) with privileges for
+   Elasticsearch + Kibana/Agent Builder.
+4. Either **Docker** (recommended) **or** Python 3.10+.
 
 ---
 
-## Identity verification
+## 🚀 Quick start (Docker — recommended)
 
-Before sharing any balance or transaction, the agent calls `customer_profile`
-and asks the caller for their **date of birth**, matching it against the
-`bank-customers` index. The demo UI shows the DOB as a small presenter hint so
-you know what to say on stage. Verification persists for the rest of the call
-(the backend keeps the Agent Builder `conversation_id` per caller).
-
-> Demo-grade scoping: the authenticated `customer_id` is passed to the agent as
-> trusted context and every tool is locked to it. In production you would
-> additionally enforce Elasticsearch document-level security / RBAC per user.
-
----
-
-## Setup
-
-### Prerequisites
-- Python 3.10+
-- An Elastic deployment with **Agent Builder** enabled and the
-  `.jina-embeddings-v5-text-small` inference endpoint ready
-- A **Sarvam AI** API key (https://dashboard.sarvam.ai)
-
-### 1. Credentials
 ```bash
-cp .env.example .env   # then fill ELASTICSEARCH_URL, ELASTIC_API_KEY,
-                       # KIBANA_URL, KIBANA_API_KEY, SARVAM_API_KEY
+# 1. Clone and enter
+git clone <your-repo-url> pratham-mitr && cd pratham-mitr
+
+# 2. Configure credentials
+cp .env.example .env        # then edit .env with your real keys/URLs
+
+# 3. One-time setup: create indices, ingest data (+ embeddings), create the agent
+docker compose --profile setup up --build
+
+# 4. Run the voice agent
+docker compose up --build   # → open http://localhost:8000
 ```
 
-### 2. Run everything
-```bash
-./run_demo.sh
-```
-Installs deps → creates the 3 indices → ingests data (+ embeddings) → creates
-the agent + 3 tools → serves the UI at **http://localhost:8000**.
+Stop with `Ctrl+C` (or `docker compose down`). Re‑run step 3 any time you want to
+refresh the data (it regenerates the last‑30‑day transaction window).
 
-### …or step by step
+## ♻️ Reset / rebuild from scratch
+
+Wipe everything this demo created in Elastic and rebuild cleanly — all via Docker:
+
 ```bash
+# 1. DELETE all 3 indices + the agent + the 3 tools (incl. any legacy agent)
+docker compose --profile teardown up --build
+
+# 2. RE-CREATE indices + ingest data (+ embeddings) + create the agent
+docker compose --profile setup up --build
+
+# 3. RUN the app
+docker compose up --build         # → http://localhost:8000
+```
+
+`teardown` runs `scripts/00_teardown.py`; it only removes this demo's objects and
+**does not** touch your inference endpoints (Jina embeddings / Groq). Verify a
+clean slate with:
+
+```bash
+source .env
+curl -s -H "Authorization: ApiKey $ELASTIC_API_KEY" "$ELASTICSEARCH_URL/_cat/indices/bank-*?v"
+```
+
+> If answers come back empty after a rebuild, temporarily set `AGENT_INFERENCE_ID=`
+> (blank) in `.env` and re-run setup to confirm the agent works with the default
+> model — that isolates whether the issue is the custom (Groq) endpoint.
+
+## 🐍 Quick start (without Docker)
+
+```bash
+cp .env.example .env        # edit with your keys
 pip install -r requirements.txt
-python scripts/01_create_index.py     # 3 indices (incl. semantic_text)
-python scripts/02_ingest_data.py      # KB + transactions + customers
+
+python scripts/01_create_index.py     # create the 3 indices (incl. semantic_text)
+python scripts/02_ingest_data.py      # ingest KB + customers + generate/ingest txns
 python scripts/verify_search.py       # (optional) prove semantic search works
-python scripts/03_create_agent.py     # Agent Builder: 3 tools + agent
-cd backend && uvicorn app:app --reload --port 8000
+python scripts/03_create_agent.py     # create the Agent Builder tools + agent
+
+./start.sh                            # or: cd backend && uvicorn app:app --port 8000
 ```
 
-Open **http://localhost:8000**, pick a caller, tap the mic, and ask in Hindi or
-English — e.g. *"मेरे खाते से पैसे क्यों कटे?"* (Priya) or *"Did my salary come this month?"* (Rajesh).
+Open **http://localhost:8000**, pick a caller, tap the mic, and ask in Hindi/Marathi/English.
+
+> **Mic note:** browsers only allow microphone access on `http://localhost` or HTTPS.
+> If the mic is blocked, use the typed‑question box (same pipeline, minus STT).
 
 ---
 
-## Project layout
+## ⚙️ Configuration (`.env`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ELASTICSEARCH_URL` | ✅ | ES endpoint (e.g. `https://…es….elastic.cloud:443`) |
+| `ELASTIC_API_KEY` | ✅ | **Encoded** ES API key |
+| `KIBANA_URL` | ✅ | Kibana endpoint (usually ES host with `.es.`→`.kb.`) |
+| `KIBANA_API_KEY` | ✅ | **Encoded** key with Agent Builder privileges |
+| `SARVAM_API_KEY` | ✅ | Sarvam AI subscription key |
+| `INFERENCE_ID` | ✅ | **text‑embedding** endpoint for `semantic_text` |
+| `AGENT_INFERENCE_ID` | – | chat‑completion endpoint for the agent (blank = default) |
+| `AGENT_ID` | – | Agent id (default `pratham-bank-support-agent`) |
+| `ES_INDEX` / `TXN_INDEX` / `CUST_INDEX` | – | Index names |
+| `SARVAM_STT_MODEL` | – | `saaras:v3` |
+| `SARVAM_TRANSLATE_MODEL` | – | `mayura:v1` |
+| `SARVAM_TTS_MODEL` | – | `bulbul:v2` or `bulbul:v3` |
+| `SARVAM_TTS_SPEAKER` | – | Voice — **must match the TTS model** |
+| `SARVAM_SPEAKER_GENDER` | – | `Male`/`Female` — aligns Hindi/Marathi verb gender to the voice |
+
+> **Voice/model pairing:** `shubh` (and most 30+ voices) are **bulbul:v3** only.
+> `bulbul:v2` supports anushka/manisha/vidya/arya (female) and abhilash/karun/hitesh
+> (male). A mismatch returns `400` from Sarvam. Set `SARVAM_SPEAKER_GENDER` to match
+> the voice so the assistant says "raha hoon" (male) vs "rahi hoon" (female).
+
+---
+
+## 👥 Demo callers & script
+
+Four "logged‑in" callers, each a *"where is my money?"* story:
+
+| Caller | DOB (for verification) | Scenario |
+|--------|------------------------|----------|
+| Rajesh Kumar (Bengaluru) | 14 Mar 1988 | salary credited, EMI debited, Flipkart refund pending |
+| Priya Sharma (Pune) | 2 Nov 1995 | **disputed ₹14,999 UPI debit** → fraud flow |
+| Anil Verma (Lucknow) | 21 Jul 1958 | pension delayed / still processing |
+| Sunita Devi (Patna) | 9 Jan 1991 | ₹2,499 Meesho refund pending |
+
+A ready‑to‑record, multilingual **role‑play script** (English ↔ Hindi ↔ Marathi) is in
+[`docs/demo-script.md`](docs/demo-script.md). The UI shows the DOB as a presenter hint.
+
+---
+
+## 📁 Project structure
+
 ```
-sarvamai-elastic/
+.
 ├── data/
-│   ├── knowledge_base.json      # generic KB (semantic)
-│   ├── transactions.json        # snapshot of last generated transactions (regenerated each ingest)
-│   └── customers.json           # private profiles (+ DOB) & demo callers
+│   ├── knowledge_base.json       # generic KB (semantic_text)
+│   ├── customers.json            # private profiles (+ DOB) & demo callers
+│   └── transactions.json         # snapshot of the last generated txns (auto‑refreshed)
 ├── scripts/
-│   ├── 01_create_index.py        # 3 indices, incl. semantic_text mapping
-│   ├── generate_transactions.py  # 100+ transactions, dynamic last-30-day dates
-│   ├── 02_ingest_data.py         # bulk ingest all three (generates transactions)
+│   ├── 00_teardown.py            # delete all indices + agent + tools (clean wipe)
+│   ├── 01_create_index.py        # create 3 indices (incl. semantic_text mapping)
+│   ├── generate_transactions.py  # 100+ txns with dynamic last‑30‑day dates
+│   ├── 02_ingest_data.py         # ingest all three (generates txns)
 │   ├── verify_search.py          # semantic search sanity check
-│   └── 03_create_agent.py        # 3 Agent Builder tools + agent
+│   └── 03_create_agent.py        # create Agent Builder tools + agent
 ├── backend/
-│   ├── sarvam.py                # Sarvam STT / Translate / TTS
-│   ├── elastic_agent.py         # Agent Builder converse (SSE)
-│   └── app.py                   # FastAPI: /api/voice, /api/text, /api/customers, /api/reset
-├── frontend/index.html          # Tailwind UI: caller switcher, mic, pipeline view
+│   ├── sarvam.py                 # Sarvam STT / Translate / TTS client
+│   ├── elastic_agent.py          # Agent Builder /converse (SSE) client
+│   └── app.py                    # FastAPI: /api/voice, /api/text, /api/customers, /api/reset
+├── frontend/index.html           # Tailwind UI: caller switcher, mic, audio
+├── docs/demo-script.md           # multilingual demo screenplay
+├── Dockerfile
+├── docker-compose.yml
 ├── requirements.txt
-├── run_demo.sh
-└── .env.example
+├── run_demo.sh                   # full reset + serve (non‑Docker)
+├── start.sh                      # serve only (non‑Docker)
+├── .env.example
+└── LICENSE
 ```
 
-## Demo tips
-- The **"behind the scenes"** panel on each reply shows the English query sent
-  to Elastic and the agent's English answer — great for narrating the flow.
-- Use the **language chips** (Auto / हिंदी / English) to force a language in a
-  noisy room; a **typed fallback** works without a mic.
-- **↻ New call** re-arms identity verification for the selected caller.
-- All secrets live in `.env` (gitignored); nothing is hard-coded.
+---
+
+## 🧪 How a turn works
+
+1. **STT** — Sarvam transcribes the audio and detects the language.
+2. **Translate → English** — the caller's words become an English query.
+3. **Agent** — the backend calls Agent Builder `/converse/async` with the English
+   query + authenticated caller context; the agent verifies DOB (first turn), then
+   calls `customer_transactions` / `customer_profile` / `bank_kb_search` and returns
+   an English answer.
+4. **Translate → caller language** — the answer is translated back.
+5. **TTS** — Sarvam speaks it; the browser plays the audio.
+
+Each `/api/voice` and `/api/text` response includes a `timings` block (per‑step
+seconds) and is logged to the server console as `⏱ /api/voice stt=… agent=… tts=…`.
+
+---
+
+## 🩺 Troubleshooting
+
+| Symptom | Likely cause / fix |
+|--------|--------------------|
+| `401 security_exception … unable to find apikey` | Wrong/expired API key. Use the **encoded** key; verify with `GET /_security/_authenticate`. |
+| `400 … /text-to-speech` | TTS **voice/model mismatch** (e.g. `shubh` needs `bulbul:v3`). |
+| Assistant uses wrong gender ("rahi" vs "raha") | Set `SARVAM_SPEAKER_GENDER` to match the voice. |
+| `502 Pipeline error: …` | The error names the failing step (STT/translate/agent/TTS). Check the message. |
+| High latency | The `agent` step dominates; point `AGENT_INFERENCE_ID` at a fast model and reduce tool calls. |
+| Mic does nothing | Use `http://localhost` (not a LAN IP) or HTTPS; or use the typed box. |
+| Setup `Address already in use` | A server is already on `:8000` — `docker compose down` or `lsof -ti :8000 \| xargs kill`. |
+
+---
+
+## 🔒 Security & limitations (demo‑grade)
+
+- All data is **synthetic**; "Pratham Bank" and its phone numbers are fictional.
+- Caller scoping is enforced by passing a trusted `customer_id` to the agent. **In
+  production**, additionally enforce Elasticsearch **document‑level security / RBAC**
+  per user, real authentication, and a real telephony/WebRTC layer.
+- Secrets live only in `.env` (gitignored / not baked into the Docker image).
+- Helpline references (1930, cybercrime.gov.in, RBI Ombudsman) are real Indian
+  resources included for realism.
+
+## 📄 License
+
+MIT — see [`LICENSE`](LICENSE).
+
+---
+
+*Built with Elastic Agent Builder + Sarvam AI. Not affiliated with any real bank.*

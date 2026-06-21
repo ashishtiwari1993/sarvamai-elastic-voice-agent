@@ -78,7 +78,6 @@
         <svg class="spin h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
         <span id="statusText">Working…</span>
       </div>
-      <div id="pipeline" class="flex flex-wrap gap-1.5 mt-3"></div>
     </div>
 
     <div id="convo" class="space-y-4"></div>
@@ -86,7 +85,6 @@
   </div>
 
 <script>
-const PIPE = [["stt","🎙️ Sarvam STT"],["xlate1","🔁 → English"],["agent","🔎 Elastic Agent"],["xlate2","🔁 → reply"],["tts","🔊 Sarvam TTS"]];
 const $ = (id) => document.getElementById(id);
 let forcedLang = "", customers = [], current = null;
 let mediaRecorder, chunks = [], recording = false;
@@ -100,9 +98,14 @@ function getAudioCtx(){
 }
 document.addEventListener("click", ()=>getAudioCtx(), {once:true});
 
+let _currentSource = null;
+function stopAudio(){
+  if(_currentSource){ try{ _currentSource.onended=null; _currentSource.stop(); }catch(e){} _currentSource=null; }
+}
 async function playAudio(b64){
   if(!b64) return;
   try{
+    stopAudio();                      // discard anything already speaking
     const bytes=atob(b64), arr=new Uint8Array(bytes.length);
     for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
     const ctx=getAudioCtx();
@@ -110,6 +113,8 @@ async function playAudio(b64){
     const buf=await ctx.decodeAudioData(arr.buffer.slice(0));
     const src=ctx.createBufferSource();
     src.buffer=buf; src.connect(ctx.destination); src.start(0);
+    _currentSource=src;
+    src.onended=()=>{ if(_currentSource===src) _currentSource=null; };
   }catch(e){ console.warn("Audio play failed:",e); }
 }
 
@@ -164,8 +169,7 @@ document.querySelectorAll(".lang-btn").forEach(btn=>btn.addEventListener("click"
 
 // ── UI helpers ──────────────────────────────────────────────
 const convo = $("convo");
-function showStatus(a){ $("status").classList.toggle("hidden",!a); if(a) $("pipeline").innerHTML = PIPE.map(([k,l])=>`<span data-step="${k}" class="px-2 py-1 rounded-md bg-slate-100 text-slate-400 text-xs">${l}</span>`).join(""); }
-function markStep(k){ const el=document.querySelector(`[data-step="${k}"]`); if(el){ el.classList.remove("bg-slate-100","text-slate-400"); el.classList.add("bg-green-100","text-green-700"); } }
+function showStatus(a){ $("status").classList.toggle("hidden",!a); }
 function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function addTurn(d){
@@ -178,27 +182,22 @@ function addTurn(d){
     <div class="flex justify-start"><div class="max-w-[70%] bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
       <div class="text-[11px] uppercase tracking-wide text-orange-600 font-semibold mb-1">Mitr</div>
       <div class="text-sm text-slate-800 leading-relaxed">${escapeHtml(d.answer_local)}</div>
-      <details class="mt-2"><summary class="text-[11px] text-slate-400 cursor-pointer hover:text-slate-600">behind the scenes ▾</summary>
-        <div class="mt-2 space-y-1.5 text-xs bg-slate-50 rounded-lg p-3">
-          <div><span class="text-slate-400">English query → Elastic:</span> <span class="text-slate-700">${escapeHtml(d.query_en)}</span></div>
-          <div><span class="text-slate-400">Agent answer (English):</span> <span class="text-slate-700">${escapeHtml(d.answer_en)}</span></div>
-        </div></details></div></div>`;
+    </div></div>`;
   convo.prepend(div);
 }
 
 async function runPipelineUI(promise){
   showStatus(true); $("statusText").textContent="Listening & understanding…";
-  const order=["stt","xlate1","agent","xlate2","tts"]; let i=0;
-  const t=setInterval(()=>{ if(i<order.length) markStep(order[i++]); },650);
   try{
-    const data=await promise; order.forEach(markStep); clearInterval(t);
+    const data=await promise;
     if(data.error){ $("statusText").textContent="⚠️ "+data.error; return; }
     showStatus(false); addTurn(data); playAudio(data.audio_base64);
-  }catch(e){ clearInterval(t); $("statusText").textContent="⚠️ "+(e.message||"Something went wrong"); }
+  }catch(e){ $("statusText").textContent="⚠️ "+(e.message||"Something went wrong"); }
 }
 
 // ── Microphone (MediaRecorder — sends audio directly to Sarvam) ──────
 $("micBtn").addEventListener("click", async ()=>{
+  stopAudio();                        // pressing mic stops Mitr mid-sentence
   if(recording){ stopRec(); return; }
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});

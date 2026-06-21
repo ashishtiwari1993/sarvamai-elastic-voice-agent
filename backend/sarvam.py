@@ -25,6 +25,10 @@ class SarvamClient:
         self.translate_model = os.getenv("SARVAM_TRANSLATE_MODEL", "mayura:v1")
         self.tts_model = os.getenv("SARVAM_TTS_MODEL", "bulbul:v2")
         self.tts_speaker = os.getenv("SARVAM_TTS_SPEAKER", "anushka")
+        # Grammatical gender of the speaker (the assistant) — drives gendered
+        # verb forms in the translation, e.g. Hindi "raha hoon" (Male) vs
+        # "rahi hoon" (Female). Keep this aligned with the TTS voice.
+        self.speaker_gender = os.getenv("SARVAM_SPEAKER_GENDER", "Male")
 
     @property
     def _key_header(self):
@@ -64,6 +68,7 @@ class SarvamClient:
                 "target_language_code": target_lang,
                 "model": self.translate_model,
                 "mode": "formal",
+                "speaker_gender": self.speaker_gender,
             }
             r = requests.post(
                 f"{SARVAM_BASE}/translate",

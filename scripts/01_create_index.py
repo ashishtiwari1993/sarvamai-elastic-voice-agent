@@ -31,7 +31,7 @@ HEADERS = {"Authorization": f"ApiKey {ES_KEY}", "Content-Type": "application/jso
 KB_MAPPING = {
     "mappings": {
         "_meta": {"description": (
-            "Bharat Bank GENERIC knowledge base: loan & deposit interest rates, "
+            "Pratham Bank GENERIC knowledge base: loan & deposit interest rates, "
             "fees and charges, UPI/banking fraud handling, and 'where is my "
             "money' explainers (failed-transaction auto-reversal, refund and "
             "pension timelines). Used by a voice agent for general questions."
@@ -49,7 +49,7 @@ KB_MAPPING = {
 TXN_MAPPING = {
     "mappings": {
         "_meta": {"description": (
-            "Bharat Bank PRIVATE customer transaction history: credits and "
+            "Pratham Bank PRIVATE customer transaction history: credits and "
             "debits (salary, EMI, UPI, ATM, POS, refunds, pension, interest) "
             "with amount, channel, counterparty, status and running balance. "
             "Query scoped to a single customer_id."
@@ -75,7 +75,7 @@ TXN_MAPPING = {
 CUST_MAPPING = {
     "mappings": {
         "_meta": {"description": (
-            "Bharat Bank PRIVATE customer profiles: name, account, registered "
+            "Pratham Bank PRIVATE customer profiles: name, account, registered "
             "mobile (last 4), date of birth (for identity verification), KYC / "
             "UPI / account status, products and city."
         )},

@@ -10,7 +10,7 @@ Tools
   3. customer_transactions ES|QL — one customer's recent transactions,
                            scoped by customer_id.
 
-Agent ("Bharat Bank Support Agent") = the three tools + instructions that
+Agent ("Pratham Bank Support Agent") = the three tools + instructions that
 verify the caller before disclosing money details and answer "where is my
 money" questions from real transaction data.
 """
@@ -27,7 +27,7 @@ SPACE = os.getenv("KIBANA_SPACE_ID", "").strip()
 KB_INDEX = os.getenv("ES_INDEX", "bank-support-kb")
 TXN_INDEX = os.getenv("TXN_INDEX", "bank-transactions")
 CUST_INDEX = os.getenv("CUST_INDEX", "bank-customers")
-AGENT_ID = os.getenv("AGENT_ID", "bharat-bank-support-agent")
+AGENT_ID = os.getenv("AGENT_ID", "pratham-bank-support-agent")
 
 BASE = KIBANA_URL + (f"/s/{SPACE}" if SPACE and SPACE != "default" else "")
 API = f"{BASE}/api/agent_builder"
@@ -38,7 +38,7 @@ TOOLS = [
         "id": "bank_kb_search",
         "type": "index_search",
         "description": (
-            "Search the Bharat Bank GENERAL knowledge base for non-personal "
+            "Search the Pratham Bank GENERAL knowledge base for non-personal "
             "questions: interest rates (home/personal loan, FD, savings), fees "
             "and transfer charges (NEFT/IMPS/RTGS/UPI), how to report UPI fraud "
             "(1930, cybercrime.gov.in), blocking a UPI ID or card, RBI rules, "
@@ -105,6 +105,12 @@ INSTRUCTIONS = (
     "customer_id and name. Always pass exactly that customer_id to tools. "
     "Never access or reveal another customer's data.\n\n"
 
+    "GREETING — on your FIRST reply in a call only: open with a short, warm "
+    "greeting that uses the caller's first name and the bank name, e.g. "
+    "'Namaste Priya ji, welcome to Pratham Bank. I am Mitr, your assistant.' "
+    "Then continue with verification or the answer in the same reply. Greet "
+    "only once per call; do not repeat the greeting on later turns.\n\n"
+
     "IDENTITY VERIFICATION — once per call, before sharing any account data:\n"
     "Call customer_profile to fetch the caller's profile, then ask: "
     "'Please tell me your date of birth to verify your identity.' "
@@ -123,9 +129,13 @@ INSTRUCTIONS = (
     "State the fact first, then any follow-up detail.\n\n"
 
     "ANSWERING RULES:\n"
-    "- Keep every response to 2-3 sentences maximum. Be concise.\n"
-    "- Get to the point in the first sentence. Skip openers like "
-    "'I understand', 'I am sorry to hear', 'I will be happy to help'.\n"
+    "- Keep responses concise — about 2-3 sentences (the first greeting turn "
+    "may be slightly longer). Be warm and polite, like a helpful bank "
+    "representative, not curt.\n"
+    "- A short, genuine acknowledgement is welcome (e.g. for fraud: 'I "
+    "understand, let's secure your account right away'), but avoid long filler "
+    "that delays the actual answer.\n"
+    "- Address the caller by their first name occasionally to stay personable.\n"
     "- Quote exact amounts with rupee symbol, dates, and counterparty names "
     "from the transaction data.\n"
     "- For PENDING credits (salary, refund, pension), state it is pending "
@@ -143,7 +153,7 @@ INSTRUCTIONS = (
 
 AGENT_PAYLOAD = {
     "id": AGENT_ID,
-    "name": "Bharat Bank Support Agent",
+    "name": "Pratham Bank Support Agent",
     "description": "Voice agent: identity verification, 'where is my money', transactions & UPI fraud.",
     "configuration": {
         "instructions": INSTRUCTIONS,
