@@ -73,14 +73,14 @@ per‑caller Agent Builder `conversation_id`, so verification persists within a 
 
 ## ✅ Prerequisites
 
-1. **An Elastic deployment with Agent Builder enabled** (Elastic Cloud / Serverless),
+1. **An Elastic deployment with Agent Builder enabled** ([Elastic Cloud / Serverless](https://www.elastic.co/docs/deploy-manage/deploy/cloud-enterprise/create-deployment)),
    plus:
    - a **text‑embedding inference endpoint** for `semantic_text`
      (this demo uses `.jina-embeddings-v5-text-small`), and
    - an LLM connector/inference for the agent (the default, or your own
      `chat_completion` endpoint).
 2. **A Sarvam AI API key** — <https://dashboard.sarvam.ai>.
-3. **Encoded Elastic API key(s)** (base64 of `id:api_key`) with privileges for
+3. **Encoded Elastic API key(s)** create an [api key](https://www.elastic.co/docs/deploy-manage/api-keys/elasticsearch-api-keys#create-api-key) with privileges for
    Elasticsearch + Kibana/Agent Builder.
 4. Either **Docker** (recommended) **or** Python 3.10+.
 
