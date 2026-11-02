@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/ff6b4c48-1958-4320-9bcc-ffa2aaf84a37
 |------|------------|---------|
 | Speech → Text | Sarvam | `saaras:v3` (auto language detect) |
 | Translation | Sarvam | `mayura:v1` |
-| Reasoning / tools | Elastic Agent Builder | custom agent + 3 tools |
+| Reasoning / tools | Elastic Agent Builder | custom agent + 4 tools |
 | Agent LLM | Elastic inference / connector | default, or `AGENT_INFERENCE_ID` |
 | Embeddings | Elasticsearch inference | `.jina-embeddings-v5-text-small` |
 | Text → Speech | Sarvam | `bulbul` |
@@ -63,7 +63,8 @@ https://github.com/user-attachments/assets/ff6b4c48-1958-4320-9bcc-ffa2aaf84a37
 ### Agent Builder tools
 
 - `bank_kb_search` — `index_search` over `bank-support-kb` (hybrid BM25 + semantic)
-- `customer_profile` — ES|QL, returns one customer's profile (used to verify DOB)
+- `customer_profile` — ES|QL, one customer's profile (no DOB)
+- `verify_dob` — ES|QL, returns only true/false for the DOB the caller states (the real DOB is never exposed to the LLM)
 - `customer_transactions` — ES|QL, returns one customer's recent transactions
 
 The backend passes the authenticated `customer_id` as trusted context and keeps a
@@ -110,7 +111,7 @@ refresh the data (it regenerates the last‑30‑day transaction window).
 Wipe everything this demo created in Elastic and rebuild cleanly — all via Docker:
 
 ```bash
-# 1. DELETE all 3 indices + the agent + the 3 tools (incl. any legacy agent)
+# 1. DELETE all 3 indices + the agent + the tools (incl. any legacy agent)
 docker compose --profile teardown up --build
 
 # 2. RE-CREATE indices + ingest data (+ embeddings) + create the agent
@@ -151,6 +152,54 @@ Open **http://localhost:8000**, pick a caller, tap the mic, and ask in Hindi/Mar
 
 > **Mic note:** browsers only allow microphone access on `http://localhost` or HTTPS.
 > If the mic is blocked, use the typed‑question box (same pipeline, minus STT).
+
+## ☁️ Deploy to Google Cloud Run (UI + voice backend only)
+
+Elastic and Sarvam stay where they are — Cloud Run only hosts the FastAPI app and
+the static UI. **Do the local setup first** (indices, data, agent), then deploy:
+
+1. Complete **Quick start** above (steps 1–3 or the non‑Docker equivalent) and
+   confirm the app works at `http://localhost:8000`.
+2. Install the [gcloud CLI](https://cloud.google.com/sdk/docs/install), then
+   `gcloud auth login`. The project needs billing enabled.
+3. Deploy:
+
+```bash
+./deploy_cloudrun.sh <GCP_PROJECT_ID> [REGION] [SERVICE_NAME]
+# e.g. ./deploy_cloudrun.sh my-gcp-project asia-south1 pratham-mitr
+```
+
+The script enables the required APIs, stores `KIBANA_API_KEY` and
+`SARVAM_API_KEY` in **Secret Manager**, passes the remaining non‑secret `.env`
+values as env vars, builds the `Dockerfile` with Cloud Build and prints the
+HTTPS URL (so the mic works). `ELASTIC_API_KEY` is **not** sent — the running app
+doesn't need it; only the setup scripts do.
+
+### Google login (only `@elastic.co`)
+
+The app has optional Google Sign-In (`backend/auth.py`). When `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET` (and `SESSION_SECRET`) are set it requires login and rejects
+any account whose verified email / hosted domain isn't `ALLOWED_EMAIL_DOMAIN`
+(default `elastic.co`). Locally there is **no login** unless you set `SESSION_SECRET` too, so `localhost` works
+exactly as before (a client ID/secret in `.env` alone doesn't turn it on). To test login
+locally, set all three plus `PUBLIC_URL=http://localhost:8000` and add
+`http://localhost:8000/auth/callback` as a redirect URI on the OAuth client.
+
+1. In Google Cloud Console → **APIs & Services → Credentials → Create credentials →
+   OAuth client ID → Web application**. (Consent screen: **Internal** if your org
+   owns the project.)
+2. Add **Authorized redirect URI**: `https://<service>-<project-number>.<region>.run.app/auth/callback`
+   (the deploy script prints the exact value).
+3. Put `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, then run `./deploy_cloudrun.sh`.
+
+Notes:
+- Deployed with `--max-instances 1` + session affinity because the verified‑caller
+  conversation map is in memory.
+- The Cloud Run URL is public (`--allow-unauthenticated`), but with Google login
+  configured the app itself rejects non‑`elastic.co` users, protecting your Sarvam /
+  Elastic quota. Without login configured, anyone with the URL can use it.
+- Re‑run the script after changing `.env` or the code. Agent prompt/tool changes
+  still need `python scripts/03_create_agent.py` (they live in Kibana).
 
 ---
 
@@ -220,6 +269,7 @@ A ready‑to‑record, multilingual **role‑play script** (English ↔ Hindi �
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
+├── deploy_cloudrun.sh            # deploy UI/backend to Cloud Run
 ├── run_demo.sh                   # full reset + serve (non‑Docker)
 ├── start.sh                      # serve only (non‑Docker)
 ├── .env.example

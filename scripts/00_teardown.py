@@ -5,7 +5,7 @@ Step 0 — Tear down everything this demo created in Elastic.
 Deletes:
   - the 3 indices (bank-support-kb, bank-transactions, bank-customers)
   - the Agent Builder agent (current id + the legacy 'bharat-bank-support-agent')
-  - the 3 custom tools (bank_kb_search, customer_profile, customer_transactions)
+  - the 4 custom tools (bank_kb_search, customer_profile, verify_dob, customer_transactions)
 
 Safe to run repeatedly — missing objects are ignored. It does NOT touch your
 inference endpoints (Jina embeddings / Groq) or anything else in the cluster.
@@ -29,7 +29,7 @@ INDICES = [
 ]
 AGENTS = list({os.getenv("AGENT_ID", "pratham-bank-support-agent"),
                "bharat-bank-support-agent"})  # include legacy id
-TOOLS = ["bank_kb_search", "customer_profile", "customer_transactions"]
+TOOLS = ["bank_kb_search", "customer_profile", "verify_dob", "customer_transactions"]
 
 ES_H = {"Authorization": f"ApiKey {ES_KEY}"}
 KB_BASE = KIBANA_URL + (f"/s/{SPACE}" if SPACE and SPACE != "default" else "")

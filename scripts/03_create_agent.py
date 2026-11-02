@@ -5,12 +5,15 @@ Step 3 — Create the Agent Builder tools + agent in Kibana.
 Tools
   1. bank_kb_search        index_search over bank-support-kb (generic knowledge,
                            hybrid BM25 + semantic).
-  2. customer_profile      ES|QL — one customer's profile (incl. DOB) for
-                           identity verification, scoped by customer_id.
-  3. customer_transactions ES|QL — one customer's recent transactions,
+  2. customer_profile      ES|QL — one customer's profile (NO date of birth),
+                           scoped by customer_id.
+  3. verify_dob            ES|QL — returns only dob_matches true/false for the
+                           DOB the caller states; the real DOB never reaches
+                           the model.
+  4. customer_transactions ES|QL — one customer's recent transactions,
                            scoped by customer_id.
 
-Agent ("Pratham Bank Support Agent") = the three tools + instructions that
+Agent ("Pratham Bank Support Agent") = the four tools + instructions that
 verify the caller before disclosing money details and answer "where is my
 money" questions from real transaction data.
 """
@@ -52,22 +55,43 @@ TOOLS = [
         "id": "customer_profile",
         "type": "esql",
         "description": (
-            "Fetch ONE customer's profile by customer_id, including their date "
-            "of birth, registered mobile last-4, account last-4, products and "
-            "account/UPI/KYC status. Use this to VERIFY the caller's identity "
-            "(compare the date of birth they tell you) and to answer questions "
-            "about account or UPI status. Always pass the authenticated "
-            "customer_id from the conversation context."
+            "Fetch ONE customer's profile by customer_id: name, registered "
+            "mobile last-4, account last-4, city, products and account/UPI/KYC "
+            "status. Use it only AFTER the caller is verified, to answer "
+            "questions about account or UPI status. It does NOT contain the "
+            "date of birth. Always pass the authenticated customer_id from the "
+            "conversation context."
         ),
         "configuration": {
             "query": (
                 f"FROM {CUST_INDEX} | WHERE customer_id == ?customer_id "
-                "| KEEP customer_id, name, dob, dob_display, mobile_last4, "
+                "| KEEP customer_id, name, mobile_last4, "
                 "account_last4, city, products, kyc_status, upi_status, "
                 "account_status | LIMIT 1"
             ),
             "params": {
                 "customer_id": {"type": "string", "description": "Authenticated customer id, e.g. CUST1002"}
+            },
+        },
+    },
+    {
+        "id": "verify_dob",
+        "type": "esql",
+        "description": (
+            "Verify the caller's identity. Pass the authenticated customer_id "
+            "and the date of birth the CALLER just told you, converted to "
+            "YYYY-MM-DD (e.g. 'fourteenth March nineteen eighty eight' -> "
+            "1988-03-14). Returns a single field dob_matches = true or false. "
+            "The real date of birth is never returned."
+        ),
+        "configuration": {
+            "query": (
+                f"FROM {CUST_INDEX} | WHERE customer_id == ?customer_id "
+                "| EVAL dob_matches = (dob == ?dob) | KEEP dob_matches | LIMIT 1"
+            ),
+            "params": {
+                "customer_id": {"type": "string", "description": "Authenticated customer id, e.g. CUST1002"},
+                "dob": {"type": "string", "description": "Date of birth stated by the caller, as YYYY-MM-DD"},
             },
         },
     },
@@ -111,13 +135,22 @@ INSTRUCTIONS = (
     "Then continue with verification or the answer in the same reply. Greet "
     "only once per call; do not repeat the greeting on later turns.\n\n"
 
-    "IDENTITY VERIFICATION — once per call, before sharing any account data:\n"
-    "Call customer_profile to fetch the caller's profile, then ask: "
-    "'Please tell me your date of birth to verify your identity.' "
-    "Match day, month, and year against the dob field (accept any spoken format). "
-    "If it matches, confirm verification and proceed. "
-    "If it does not match, say you cannot share details and suggest visiting a branch. "
-    "Never read the date of birth back to the caller. Do not ask again once verified.\n\n"
+    "IDENTITY VERIFICATION — once per call, BEFORE sharing any account or "
+    "transaction detail. You do not know the caller's date of birth and must "
+    "never state, hint at, or confirm one yourself.\n"
+    "1. If the caller is not yet verified, do NOT call customer_profile or "
+    "customer_transactions. Greet them and ask: 'To verify your identity, "
+    "please tell me your date of birth.' If they already asked a question, say "
+    "you will answer it right after verification.\n"
+    "2. When the caller says a date of birth, convert it to YYYY-MM-DD and call "
+    "verify_dob with the authenticated customer_id.\n"
+    "3. If dob_matches is true: say they are verified and answer their original "
+    "question using the data tools. Do not ask again this call.\n"
+    "4. If false: say it does not match and ask once more. After two failed "
+    "attempts, say you cannot share account details and suggest visiting a "
+    "branch or calling 1800-123-4567.\n"
+    "5. Never say a date of birth that the caller did not just say. Never ask "
+    "the caller to 'confirm' a date you provide.\n\n"
 
     "URGENCY DETECTION — classify the caller's intent before answering:\n"
     "URGENT (fraud, unknown debit, blocked card, OTP shared with someone): "
@@ -181,7 +214,7 @@ def main():
         recreate("tools", t["id"], t)
     print("Creating agent ...")
     recreate("agents", AGENT_ID, AGENT_PAYLOAD)
-    print(f"\nDone. Agent '{AGENT_ID}' is ready with 3 tools.")
+    print(f"\nDone. Agent '{AGENT_ID}' is ready with {len(TOOLS)} tools.")
 
 
 if __name__ == "__main__":

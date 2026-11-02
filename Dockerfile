@@ -22,4 +22,5 @@ WORKDIR /app/backend
 EXPOSE 8000
 
 # Default: run the web server. (The 'setup' compose service overrides this.)
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Cloud Run injects $PORT (8080); locally it falls back to 8000.
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=*"]

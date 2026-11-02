@@ -30,9 +30,10 @@ The backend (`backend/app.py`) orchestrates these 5 calls and serves the fronten
 - `bank-customers` — PRIVATE profiles incl. `dob` for identity verification.
 
 ### Agent Builder (created by `scripts/03_create_agent.py`)
-Agent `pratham-bank-support-agent` with 3 tools:
+Agent `pratham-bank-support-agent` with 4 tools:
 - `bank_kb_search` (index_search → bank-support-kb)
-- `customer_profile` (esql, param `customer_id`) — used to verify DOB
+- `customer_profile` (esql, param `customer_id`) — profile **without** DOB
+- `verify_dob` (esql, params `customer_id`, `dob`) — returns only `dob_matches` true/false, so the real DOB never reaches the LLM
 - `customer_transactions` (esql, param `customer_id`) — recent transactions
 
 The backend passes the authenticated `customer_id` as trusted context and keeps a

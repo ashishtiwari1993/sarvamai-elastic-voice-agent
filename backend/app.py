@@ -28,6 +28,7 @@ from sarvam import SarvamClient
 from elastic_agent import AgentBuilderClient
 
 load_dotenv()
+from auth import setup_auth  # noqa: E402  (reads env, so import after load_dotenv)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(HERE, "..", "frontend")
@@ -37,6 +38,7 @@ EN = "en-IN"
 app = FastAPI(title="Pratham Bank Voice Agent")
 sarvam = SarvamClient()
 agent = AgentBuilderClient()
+setup_auth(app)  # optional Google login (domain-restricted)
 
 # Demo customers (the "logged-in" callers). DOB stays server-side / as a demo hint.
 with open(os.path.join(DATA_DIR, "customers.json"), encoding="utf-8") as f:
